@@ -39,3 +39,4 @@ build/
 
 ### Config ###
 .env
+dependency-reduced-pom.xml
