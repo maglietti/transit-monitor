@@ -1,83 +1,97 @@
-package com.example.transit;
+package com.example.transit.examples;
 
-import io.github.cdimascio.dotenv.Dotenv;
+import com.example.transit.service.*;
+import com.example.transit.util.LoggingUtil;
+import org.apache.ignite.client.IgniteClient;
+
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 
 /**
- * Test class for the data ingestion service.
+ * Example demonstrating the data ingestion pipeline from GTFS feed to Ignite.
+ * This class shows how to:
+ * 1. Set up the database schema if not already set up
+ * 2. Start and configure the data ingestion service
+ * 3. Verify ingested data
  */
-public class DataIngestionTest {
+public class IngestExample {
 
     public static void main(String[] args) {
-        System.out.println("=== Data Ingestion Service Test ===");
+        System.out.println("=== Data Ingestion Service Example ===");
 
-        // Load environment variables from .env file
-        Dotenv dotenv = Dotenv.configure().ignoreIfMissing().load();
+        // Configure logging to suppress unnecessary output
+        LoggingUtil.setLogs("OFF");
 
-        // Retrieve configuration values
-        String apiToken = dotenv.get("API_TOKEN");
-        String baseUrl = dotenv.get("GTFS_BASE_URL");
-        String agency = dotenv.get("GTFS_AGENCY");
-
-        // Validate configuration
-        if (apiToken == null || baseUrl == null || agency == null) {
-            System.err.println("Missing configuration. Please check your .env file.");
-            System.err.println("Required variables: API_TOKEN, GTFS_BASE_URL, GTFS_AGENCY");
+        // Load configuration
+        ConfigService config = ConfigService.getInstance();
+        if (!config.validateConfiguration()) {
             return;
         }
 
-        // Construct the full feed URL
-        String feedUrl = String.format("%s?api_key=%s&agency=%s", baseUrl, apiToken, agency);
+        // Create references to hold services
+        final ConnectService[] connectionServiceRef = new ConnectService[1];
+        final IngestService[] ingestServiceRef = new IngestService[1];
 
-        // Create a reference to hold the ingestion service
-        final DataIngestionService[] serviceRef = new DataIngestionService[1];
-
-        // Register shutdown hook with the reference array
+        // Register shutdown hook with the reference arrays
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             System.out.println("Shutdown hook triggered, cleaning up resources...");
-            if (serviceRef[0] != null) {
-                serviceRef[0].stop();
+            if (ingestServiceRef[0] != null) {
+                ingestServiceRef[0].stop();
             }
-            IgniteConnection.close();
+            if (connectionServiceRef[0] != null) {
+                connectionServiceRef[0].close();
+            }
         }));
 
         try {
-            // Create and start the schema
-            System.out.println("\n--- Setting up database schema ---");
-            SchemaSetup schemaSetup = new SchemaSetup();
-            boolean schemaCreated = schemaSetup.createSchema();
+            // Create Ignite connection
+            System.out.println("\n--- Connecting to Ignite cluster");
+            ConnectService connectionService = new ConnectService();
+            connectionServiceRef[0] = connectionService;
+
+            // Create reporting service
+            ReportService reportService = new ReportService(connectionService.getClient());
+
+            // Create and initialize the schema
+            System.out.println("\n--- Setting up database schema");
+            SchemaService schemaService = new SchemaService(connectionService);
+            boolean schemaCreated = schemaService.createSchema();
 
             if (!schemaCreated) {
-                System.err.println("Failed to create schema. Aborting test.");
+                System.err.println("Failed to create schema. Aborting example.");
                 return;
             }
 
-            // Verify initial state (should be empty or contain previous test data)
-            System.out.println("\n--- Initial data state ---");
-            DataVerifier.verifyData();
+            // Verify initial state (should be empty or contain previous data)
+            System.out.println("\n--- Initial data state");
+            reportService.sampleVehicleData();
 
-            // Create and start the data ingestion service
-            System.out.println("\n--- Starting data ingestion service ---");
-            DataIngestionService ingestService = new DataIngestionService(feedUrl)
+            // Create GTFS feed service and data ingestion service
+            System.out.println("\n=== Starting data ingestion service");
+            GtfsService feedService = new GtfsService(config.getFeedUrl());
+
+            IngestService ingestService = new IngestService(
+                    feedService, connectionService)
                     .withBatchSize(100); // Configure batch size
 
             // Store the service in our reference array for the shutdown hook
-            serviceRef[0] = ingestService;
+            ingestServiceRef[0] = ingestService;
 
-            ingestService.start(30); // Fetch every 30 seconds
+            ingestService.start(15); // Fetch every 15 seconds
+
+            reportService.displayIngestionStatus(ingestService.getStatistics());
 
             // Wait for some data to be ingested
-            System.out.println("\nWaiting for data ingestion (45 seconds)...");
+            System.out.println("\n=== Waiting for data ingestion (45 seconds)...");
             System.out.println(); // Add a blank line for separation
 
             // Create a volatile boolean for thread signaling
-            final boolean[] keepSpinning = {true};
+            final boolean[] keepSpinning = { true };
 
             // Spinning characters and counter
-            String[] spinnerChars = new String[]{"⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"};
-            int[] seconds = {0}; // Using array to make it accessible inside the interceptor
-            int[] spinPosition = {0}; // Track spinner position separately
+            String[] spinnerChars = new String[] { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" };
+            int[] seconds = { 0 }; // Using array to make it accessible inside the interceptor
+            int[] spinPosition = { 0 }; // Track spinner position separately
 
             // Original System.out to be restored later
             PrintStream originalOut = System.out;
@@ -147,39 +161,39 @@ public class DataIngestionTest {
 
             // Clean up the spinner line
             originalOut.print("\r\033[K");
-            originalOut.println("Data ingestion wait complete!");
+            originalOut.println("--- Data ingestion wait complete!");
 
             // Restore original System.out
             System.setOut(originalOut);
 
-            // Print ingestion statistics
-            ingestService.printStatistics();
-
             // Verify data after ingestion
-            System.out.println("\n--- Data state after ingestion ---");
-            DataVerifier.verifyData();
+            System.out.println("\n--- Data state after ingestion");
+            reportService.displaySystemStatistics();
 
             // Stop the ingestion service
-            System.out.println("\n--- Stopping data ingestion service ---");
+            System.out.println("\n=== Stopping data ingestion service");
             ingestService.stop();
+            reportService.displayIngestionStatus(ingestService.getStatistics());
 
             // Give threads time to clean up
             System.out.println("Waiting for all threads to terminate...");
             Thread.sleep(1000);
 
-            System.out.println("\nTest completed successfully!");
+            System.out.println("\n=== Example completed successfully!");
 
         } catch (Exception e) {
-            System.err.println("Error during test: " + e.getMessage());
+            System.err.println("Error during example: " + e.getMessage());
             e.printStackTrace();
         } finally {
-            // Make sure ingestion service is stopped if it exists
-            if (serviceRef[0] != null) {
-                serviceRef[0].stop();
+            // Make sure ingestion service is stopped
+            if (ingestServiceRef[0] != null) {
+                ingestServiceRef[0].stop();
             }
 
             // Clean up connection
-            IgniteConnection.close();
+            if (connectionServiceRef[0] != null) {
+                connectionServiceRef[0].close();
+            }
         }
     }
 }

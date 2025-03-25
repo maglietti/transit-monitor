@@ -1,10 +1,9 @@
-package com.example.transit;
+package com.example.transit.service;
 
 import org.apache.ignite.client.IgniteClient;
 
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -13,14 +12,13 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Service responsible for periodically fetching transit data and storing it in Ignite.
- * Implements a resilient data ingestion pipeline with configurable scheduling.
  *
- * This service uses a scheduled executor to periodically fetch data from the GTFS
- * feed and store it in the Ignite database using batch processing for efficiency.
+ * This service uses a scheduled executor to periodically fetch data from the
+ * GTFS feed and store it in the Ignite database.
  */
-public class DataIngestionService {
-    private final GTFSFeedClient feedClient;
-    private final IgniteClient igniteClient;
+public class IngestService {
+    private final GtfsService feedService;
+    private final ConnectService connectionService;
     private final ScheduledExecutorService scheduler;
     private ScheduledFuture<?> scheduledTask;
     private int batchSize = 100; // Default batch size
@@ -35,11 +33,12 @@ public class DataIngestionService {
     /**
      * Constructs a new data ingestion service.
      *
-     * @param feedUrl The URL of the GTFS realtime feed
+     * @param feedService       The service for retrieving GTFS feed data
+     * @param connectionService The service providing Ignite client connections
      */
-    public DataIngestionService(String feedUrl) {
-        this.feedClient = new GTFSFeedClient(feedUrl);
-        this.igniteClient = IgniteConnection.getClient();
+    public IngestService(GtfsService feedService, ConnectService connectionService) {
+        this.feedService = feedService;
+        this.connectionService = connectionService;
         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "data-ingestion-thread");
             t.setDaemon(true);
@@ -59,7 +58,7 @@ public class DataIngestionService {
      * @param batchSize Number of records to process in each batch
      * @return This DataIngestionService instance for method chaining
      */
-    public DataIngestionService withBatchSize(int batchSize) {
+    public IngestService withBatchSize(int batchSize) {
         if (batchSize < 1) {
             throw new IllegalArgumentException("Batch size must be at least 1");
         }
@@ -91,10 +90,9 @@ public class DataIngestionService {
                 this::fetchAndStoreData,
                 0,
                 intervalSeconds,
-                TimeUnit.SECONDS
-        );
+                TimeUnit.SECONDS);
 
-        System.out.println("Data ingestion service started with "
+        System.out.println("+++ Data ingestion service started with "
                 + intervalSeconds + " second interval");
     }
 
@@ -114,17 +112,16 @@ public class DataIngestionService {
                     // Force shutdown if graceful shutdown fails
                     scheduler.shutdownNow();
                 }
-                System.out.println("Data ingestion service stopped");
+                System.out.println("=== Data ingestion service stopped");
             } catch (InterruptedException e) {
                 // If we're interrupted during shutdown, force immediate shutdown
                 scheduler.shutdownNow();
                 Thread.currentThread().interrupt(); // Preserve interrupt status
-                System.out.println("Data ingestion service shutdown interrupted");
+                System.err.println("Data ingestion service shutdown interrupted");
             }
 
-            printStatistics();
         } else {
-            System.out.println("Ingestion service is not running");
+            System.err.println("Ingestion service is not running");
         }
     }
 
@@ -135,17 +132,17 @@ public class DataIngestionService {
     private void fetchAndStoreData() {
         long fetchStartTime = System.currentTimeMillis();
         try {
-            // Step 1: Fetch the latest vehicle positions
-            List<VehiclePosition> positions = feedClient.getVehiclePositions();
+            // Fetch the latest vehicle positions
+            List<Map<String, Object>> positions = feedService.getVehiclePositions();
             lastFetchCount.set(positions.size());
             totalFetched.addAndGet(positions.size());
 
             if (!positions.isEmpty()) {
-                // Step 2: Store the positions in the database
+                // Store the positions in the database
                 int recordsStored = storeVehiclePositions(positions);
                 totalStored.addAndGet(recordsStored);
 
-                System.out.println("Fetched " + positions.size() +
+                System.out.println("--- Fetched " + positions.size() +
                         " and stored " + recordsStored +
                         " vehicle positions");
             } else {
@@ -162,64 +159,53 @@ public class DataIngestionService {
 
     /**
      * Stores vehicle positions in Ignite using efficient batch processing.
-     * Each batch is processed in a single transaction for atomicity.
+     * Each batch is processed in a single transaction using the runInTransaction
+     * method
+     * for automatic transaction lifecycle management.
      *
      * @param positions List of vehicle positions to store
      * @return Number of records successfully stored
      */
-    private int storeVehiclePositions(List<VehiclePosition> positions) {
+    private int storeVehiclePositions(List<Map<String, Object>> positions) {
         if (positions.isEmpty()) {
             return 0;
         }
 
         int recordsProcessed = 0;
+        IgniteClient client = connectionService.getClient();
 
         try {
             // Process records in batches
             for (int i = 0; i < positions.size(); i += batchSize) {
+                // Prepare SQL statement
+                String insertSql = "INSERT INTO vehicle_positions " +
+                        " (vehicle_id, route_id, latitude, longitude, time_stamp, current_status) " +
+                        "VALUES (?, ?, ?, ?, ?, ?)";
+
                 // Determine the end index for current batch
                 int endIndex = Math.min(i + batchSize, positions.size());
-                List<VehiclePosition> batch = positions.subList(i, endIndex);
+                List<Map<String, Object>> batch = positions.subList(i, endIndex);
 
-                // Create a transaction for each batch
-                var tx = igniteClient.transactions().begin();
 
-                try {
+                // Use runInTransaction to automatically handle transaction lifecycle
+                client.transactions().runInTransaction(tx -> {
                     // Insert all records in the current batch
-                    for (VehiclePosition position : batch) {
-                        // Convert epoch milliseconds to LocalDateTime for Ignite
-                        LocalDateTime timestamp = LocalDateTime.ofInstant(
-                                position.getTimestampAsInstant(),
-                                ZoneId.systemDefault()
-                        );
-
-                        // Use SQL API to execute insert within transaction
-                        igniteClient.sql().execute(tx,
-                                "INSERT INTO vehicle_positions " +
-                                        "(vehicle_id, route_id, latitude, longitude, time_stamp, current_status) " +
-                                        "VALUES (?, ?, ?, ?, ?, ?)",
-                                position.getVehicleId(),
-                                position.getRouteId(),
-                                position.getLatitude(),
-                                position.getLongitude(),
-                                timestamp,
-                                position.getCurrentStatus()
-                        );
+                    for (Map<String, Object> position : batch) {
+                        // Use SQL API to execute insert batch within transaction
+                        client.sql().execute(tx,
+                                insertSql,
+                                position.get("vehicle_id"),
+                                position.get("route_id"),
+                                position.get("latitude"),
+                                position.get("longitude"),
+                                position.get("time_stamp"),
+                                position.get("current_status"));
                     }
+                    // No need for explicit commit - handled by runInTransaction
+                    return null; // Return value not used in this case
+                });
 
-                    // Commit the transaction for this batch
-                    tx.commit();
-                    recordsProcessed += batch.size();
-
-                } catch (Exception e) {
-                    // If there was an error, try to roll back the transaction
-                    try {
-                        tx.rollback();
-                    } catch (Exception rollbackEx) {
-                        System.err.println("Error rolling back transaction: " + rollbackEx.getMessage());
-                    }
-                    throw e; // Re-throw to be caught by outer catch
-                }
+                recordsProcessed += batch.size();
             }
 
             return recordsProcessed;
@@ -233,7 +219,7 @@ public class DataIngestionService {
     /**
      * Returns a snapshot of current ingestion statistics.
      *
-     * @return Map containing statistic values
+     * @return IngestStats object containing statistic values
      */
     public IngestStats getStatistics() {
         long runningTimeMs = System.currentTimeMillis() - startTime;
@@ -244,8 +230,7 @@ public class DataIngestionService {
                 lastFetchCount.get(),
                 lastFetchTime.get(),
                 runningTimeMs,
-                scheduledTask != null
-        );
+                scheduledTask != null);
     }
 
     /**
@@ -254,20 +239,14 @@ public class DataIngestionService {
     public void printStatistics() {
         IngestStats stats = getStatistics();
 
-        System.out.println("\n=== Data Ingestion Statistics ===");
+        System.out.println("\n=== Ingestion Statistics ===");
         System.out.println("• Status: " + (stats.isRunning() ? "Running" : "Stopped"));
         System.out.println("• Running time: " + formatDuration(stats.getRunningTimeMs()));
         System.out.println("• Total records fetched: " + stats.getTotalFetched());
         System.out.println("• Total records stored: " + stats.getTotalStored());
         System.out.println("• Last fetch count: " + stats.getLastFetchCount());
         System.out.println("• Last fetch time: " + stats.getLastFetchTimeMs() + "ms");
-
-        // Calculate rates if we have data
-        if (stats.getRunningTimeMs() > 0 && stats.getTotalFetched() > 0) {
-            double recordsPerSecond = stats.getTotalFetched() * 1000.0 / stats.getRunningTimeMs();
-            System.out.println("• Ingestion rate: " + String.format("%.2f", recordsPerSecond) + " records/second");
-        }
-        System.out.println("==============================\n");
+        System.out.println("============================\n");
     }
 
     /**
@@ -295,7 +274,7 @@ public class DataIngestionService {
         private final boolean running;
 
         public IngestStats(long totalFetched, long totalStored, long lastFetchCount,
-                           long lastFetchTimeMs, long runningTimeMs, boolean running) {
+                long lastFetchTimeMs, long runningTimeMs, boolean running) {
             this.totalFetched = totalFetched;
             this.totalStored = totalStored;
             this.lastFetchCount = lastFetchCount;
@@ -305,11 +284,23 @@ public class DataIngestionService {
         }
 
         // Getters
-        public long getTotalFetched() { return totalFetched; }
-        public long getTotalStored() { return totalStored; }
-        public long getLastFetchCount() { return lastFetchCount; }
-        public long getLastFetchTimeMs() { return lastFetchTimeMs; }
-        public long getRunningTimeMs() { return runningTimeMs; }
-        public boolean isRunning() { return running; }
+        public long getTotalFetched() {
+            return totalFetched;
+        }
+        public long getTotalStored() {
+            return totalStored;
+        }
+        public long getLastFetchCount() {
+            return lastFetchCount;
+        }
+        public long getLastFetchTimeMs() {
+            return lastFetchTimeMs;
+        }
+        public long getRunningTimeMs() {
+            return runningTimeMs;
+        }
+        public boolean isRunning() {
+            return running;
+        }
     }
 }

@@ -1,4 +1,4 @@
-package com.example.transit;
+package com.example.transit.util;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -11,7 +11,7 @@ import java.time.format.DateTimeFormatter;
  * - Logging utilities with timestamp
  * - Text formatting utilities
  */
-public class TerminalUtils {
+public class TerminalUtil {
     // Terminal colors - ANSI escape codes
     public static final String ANSI_RESET = "\u001B[0m";
     public static final String ANSI_RED = "\u001B[31m";
@@ -109,10 +109,10 @@ public class TerminalUtils {
      * Prints the welcome banner
      */
     public static void printWelcomeBanner() {
-        System.out.println(ANSI_CYAN + "╔══════════════════════════════════════════════════════════════╗");
-        System.out.println("║                TRANSIT MONITORING SYSTEM                    ║");
-        System.out.println("║                      v1.0.0                                 ║");
-        System.out.println("╚══════════════════════════════════════════════════════════════╝" + ANSI_RESET);
+        System.out.println(ANSI_CYAN + ANSI_RESET + "╔══════════════════════════════════════════════════════════════╗");
+        System.out.println("║                TRANSIT MONITORING SYSTEM                     ║");
+        System.out.println("║                      v1.0.0                                  ║");
+        System.out.println("╚══════════════════════════════════════════════════════════════╝");
     }
 
     /**
@@ -139,13 +139,15 @@ public class TerminalUtils {
      * Logs an informational message with timestamp.
      */
     public static void logInfo(String message) {
-        System.out.println("[" + LocalDateTime.now().format(TIME_FORMATTER) + "] " + ANSI_GREEN + "INFO: " + ANSI_RESET + message);
+        System.out.println(
+                "[" + LocalDateTime.now().format(TIME_FORMATTER) + "] " + ANSI_GREEN + "INFO: " + ANSI_RESET + message);
     }
 
     /**
      * Logs an error message with timestamp.
      */
     public static void logError(String message) {
-        System.err.println("[" + LocalDateTime.now().format(TIME_FORMATTER) + "] " + ANSI_RED + "ERROR: " + ANSI_RESET + message);
+        System.err.println(
+                "[" + LocalDateTime.now().format(TIME_FORMATTER) + "] " + ANSI_RED + "ERROR: " + ANSI_RESET + message);
     }
 }

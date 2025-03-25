@@ -37,8 +37,5 @@ build/
 ### Mac OS ###
 .DS_Store
 
-### Configuration ###
+### Config ###
 .env
-
-### Builds ###
-dependency-reduced-pom.xml
