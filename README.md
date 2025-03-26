@@ -14,14 +14,14 @@ The Transit Monitoring System is a Java application that connects to a GTFS-real
 - **Real-time data ingestion**: Connects to GTFS-realtime feeds to retrieve vehicle position data
 - **Database storage**: Stores transit data in **Apache Ignite 3** for fast querying and analysis
 - **Service monitoring**: Automatically detects potential service disruptions:
-    - Delayed vehicles (stopped for too long)
-    - Vehicle bunching (vehicles on same route too close together)
-    - Routes with insufficient coverage
-    - Offline vehicles (not reporting positions)
+  - Delayed vehicles (stopped for too long)
+  - Vehicle bunching (vehicles on same route too close together)
+  - Routes with insufficient coverage
+  - Offline vehicles (not reporting positions)
 - **Live dashboard**: Console-based dashboard with three rotating views:
-    - Summary view (active vehicles by route, status distribution)
-    - Alerts view (recent service alerts and statistics)
-    - System details view (system statistics, monitoring thresholds)
+  - Summary view (active vehicles by route, status distribution)
+  - Alerts view (recent service alerts and statistics)
+  - System details view (system statistics, monitoring thresholds)
 
 ## Prerequisites
 
@@ -55,6 +55,7 @@ docker-compose ps
 ```
 
 The Docker setup creates three Ignite nodes accessible at:
+
 - Node1: localhost:10800
 - Node2: localhost:10801
 - Node3: localhost:10802
@@ -88,6 +89,7 @@ java -cp target/transit-monitor-1.0.jar com.example.transit.examples.ConnectExam
 ```
 
 This example:
+
 - Connects to the Ignite cluster
 - Displays cluster topology information
 - Shows connection details and retry policies
@@ -102,6 +104,7 @@ java -cp target/transit-monitor-1.0.jar com.example.transit.examples.SchemaSetup
 ```
 
 This example:
+
 - Creates the required database table for vehicle positions
 - Inserts test data to verify write operations
 - Queries the data to verify read operations
@@ -116,6 +119,7 @@ java -cp target/transit-monitor-1.0.jar com.example.transit.examples.GtfsFeedExa
 ```
 
 This example:
+
 - Connects to the configured GTFS feed
 - Retrieves vehicle position data
 - Displays sample data and statistics
@@ -130,6 +134,7 @@ java -cp target/transit-monitor-1.0.jar com.example.transit.examples.IngestExamp
 ```
 
 This example:
+
 - Sets up the database schema
 - Starts the data ingestion service
 - Runs for 45 seconds, fetching data every 15 seconds
@@ -145,26 +150,11 @@ java -cp target/transit-monitor-1.0.jar com.example.transit.examples.ServiceMoni
 ```
 
 This example:
+
 - Verifies the database contains vehicle position data
 - Starts the monitoring service to detect service disruptions
 - Displays alert statistics every 30 seconds
 - Shows sample service alerts when stopped
-
-## Dashboard
-
-The main application's dashboard automatically rotates between three views:
-
-1. **Summary View**: Shows active vehicles by route, vehicle status distribution, and data ingestion status
-2. **Alerts View**: Displays recent service alerts and alert statistics by type
-3. **Details View**: Shows system statistics, monitoring thresholds, and connection status
-
-## Extending the System
-
-The modular architecture makes it easy to extend the system:
-
-- Add new monitoring conditions in `MonitorService`
-- Create new dashboard views in `TransitMonitorApp`
-- Implement additional data sources by creating new service classes
 
 ## Troubleshooting
 
