@@ -42,7 +42,7 @@ GTFS_BASE_URL=https://example.com/gtfs-rt/vehicle-positions
 GTFS_AGENCY=agency_id
 ```
 
-### Apache Ignite Setup
+### Apache Ignite Cluster Setup
 
 The application requires an Apache Ignite 3 cluster. You can easily start a local 3-node cluster using the provided Docker Compose file:
 
@@ -54,11 +54,28 @@ docker-compose up -d
 docker-compose ps
 ```
 
-The Docker setup creates three Ignite nodes accessible at:
+Start the Ignite CLI in Docker:
 
-- Node1: localhost:10800
-- Node2: localhost:10801
-- Node3: localhost:10802
+```bash
+docker run --rm -it --network=host -e LANG=C.UTF-8 -e LC_ALL=C.UTF-8 apacheignite/ignite:3.0.0 cli
+```
+
+Inside the CLI, connect to one of the nodes:
+
+```bash
+connect http://localhost:10300
+```
+
+Initialize the cluster with a name and metastorage group:
+
+```bash
+cluster init --name=ignite3 --metastorage-group=node1,node2,node3
+```
+
+Exit the CLI by typing `exit` or pressing Ctrl+D
+
+> [!warning]
+> The initialization step MUST be performed for a new cluster.
 
 To stop the cluster:
 
