@@ -40,14 +40,7 @@ public class SchemaSetup {
                 // Define and create the table
                 TableDefinition tableDefinition = TableDefinition.builder("vehicle_positions")
                         .ifNotExists()
-                        .columns(
-                                ColumnDefinition.column("vehicle_id", ColumnType.VARCHAR),
-                                ColumnDefinition.column("route_id", ColumnType.VARCHAR),
-                                ColumnDefinition.column("latitude", ColumnType.DOUBLE),
-                                ColumnDefinition.column("longitude", ColumnType.DOUBLE),
-                                ColumnDefinition.column("time_stamp", ColumnType.TIMESTAMP),
-                                ColumnDefinition.column("current_status", ColumnType.VARCHAR)
-                        )
+                        .record(VehiclePosition.class)
                         // Define a composite primary key on vehicle_id and time_stamp
                         // This enables efficient queries for a vehicle's history
                         .primaryKey("vehicle_id", "time_stamp")

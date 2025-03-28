@@ -1,8 +1,15 @@
 package com.example.transit;
 
+import org.apache.ignite.catalog.annotations.Column;
+import org.apache.ignite.catalog.annotations.Id;
+import org.apache.ignite.sql.SqlRow;
+
+import java.sql.Time;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.io.Serializable;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Objects;
 
 /**
@@ -14,11 +21,19 @@ public class VehiclePosition implements Serializable {
     // Good practice to define a serialVersionUID for Serializable classes
     private static final long serialVersionUID = 1L;
 
+    @Id
+    @Column("vehicle_id")
     private String vehicleId;    // Unique identifier for the vehicle
+    @Column("route_id")
     private String routeId;      // The route this vehicle is serving
-    private double latitude;     // Geographic latitude coordinate
-    private double longitude;    // Geographic longitude coordinate
-    private long timestamp;      // When this position was recorded (epoch millis)
+    @Column
+    private Double latitude;     // Geographic latitude coordinate
+    @Column
+    private Double longitude;    // Geographic longitude coordinate
+    @Id
+    @Column("time_stamp")
+    private Long timestamp;      // When this position was recorded (epoch millis)
+    @Column("current_status")
     private String currentStatus; // Vehicle status (IN_TRANSIT_TO, STOPPED_AT, etc.)
 
     /**
@@ -46,6 +61,15 @@ public class VehiclePosition implements Serializable {
         this.longitude = longitude;
         this.timestamp = timestamp;
         this.currentStatus = currentStatus;
+    }
+
+    public VehiclePosition(SqlRow row) {
+        this(row.stringValue("vehicle_id"),
+                row.stringValue("route_id"),
+                row.doubleValue("latitude"),
+                row.doubleValue("longitude"),
+                row.value("time_stamp"),
+                row.stringValue("current_status"));
     }
 
     // Getters and Setters

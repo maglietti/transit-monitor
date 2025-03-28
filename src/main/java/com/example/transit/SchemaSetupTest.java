@@ -58,19 +58,10 @@ public class SchemaSetupTest {
                     );
 
                     // Use RecordView with Tuple approach for insert
-                    RecordView<Tuple> recordView = table.recordView();
-
-                    // Create a tuple with field names that match database columns
-                    Tuple vehicleTuple = Tuple.create()
-                            .set("vehicle_id", testVehicle.getVehicleId())
-                            .set("route_id", testVehicle.getRouteId())
-                            .set("latitude", testVehicle.getLatitude())
-                            .set("longitude", testVehicle.getLongitude())
-                            .set("time_stamp", localDateTime)  // Use LocalDateTime, not Instant
-                            .set("current_status", testVehicle.getCurrentStatus());
+                    var recordView = table.recordView(VehiclePosition.class);
 
                     // Insert test data using the recordView
-                    recordView.insert(null, vehicleTuple);
+                    recordView.insert(null, testVehicle);
                     System.out.println("Test record inserted successfully: " + testVehicle);
 
                     // Use SQL approach to query
@@ -81,20 +72,7 @@ public class SchemaSetupTest {
 
                     List<VehiclePosition> results = new ArrayList<>();
                     resultSet.forEachRemaining(row -> {
-                        // Extract timestamp milliseconds from LocalDateTime
-                        LocalDateTime resultDateTime = row.value("time_stamp");
-                        // Convert LocalDateTime to Instant (requires a ZoneId)
-                        Instant instant = resultDateTime.atZone(ZoneId.systemDefault()).toInstant();
-                        long timestamp = instant.toEpochMilli();
-
-                        VehiclePosition position = new VehiclePosition(
-                                row.stringValue("vehicle_id"),
-                                row.stringValue("route_id"),
-                                row.doubleValue("latitude"),
-                                row.doubleValue("longitude"),
-                                timestamp,
-                                row.stringValue("current_status")
-                        );
+                        VehiclePosition position = new VehiclePosition(row);
                         results.add(position);
                         System.out.println("Found test record: " + position);
                     });
