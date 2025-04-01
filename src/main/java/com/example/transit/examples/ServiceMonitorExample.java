@@ -1,47 +1,69 @@
 package com.example.transit.examples;
 
-import com.example.transit.service.*;
-import com.example.transit.util.LoggingUtil;
+import com.example.transit.config.IgniteConnectionManager;
+import com.example.transit.model.ServiceAlert;
+import com.example.transit.service.MonitorService;
+import com.example.transit.service.ReportingService;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * Example application demonstrating the use of the monitoring service.
- * Shows how to set up and run the monitoring service to detect transit system
- * issues.
+ * Shows how to set up and run the monitoring service to detect transit system issues.
  */
 public class ServiceMonitorExample {
 
-    private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private static final Logger logger = LogManager.getLogger(ServiceMonitorExample.class);
 
     public static void main(String[] args) {
+
+        // Handle JUL logging
+        java.util.logging.LogManager.getLogManager().reset();
+        org.apache.logging.log4j.jul.LogManager.getLogManager();
+        java.util.logging.Logger.getLogger("").setLevel(java.util.logging.Level.WARNING);
+
         System.out.println("=== Service Monitor Example ===");
 
-        // Configure logging to suppress unnecessary output
-        LoggingUtil.setLogs("OFF");
-
         // Create a connection service that will be used throughout the application
-        try (ConnectService connectionService = new ConnectService()) {
-            // Create reporting service
-            ReportService reportingService = new ReportService(connectionService.getClient());
+        try (IgniteConnectionManager connectionManager = new IgniteConnectionManager()) {
+            runMonitoringDemo(connectionManager);
+        } catch (Exception e) {
+            logger.error("Error during monitor example: {}", e.getMessage());
+        }
+    }
 
-            // First, verify we have data to monitor
-            System.out.println("\n--- Verifying database data...");
-            reportingService.sampleVehicleData();
+    /**
+     * Run the monitoring demonstration with the provided connection manager.
+     */
+    private static void runMonitoringDemo(IgniteConnectionManager connectionManager) throws IOException {
+        // Create reporting service
+        ReportingService reportingService = new ReportingService(connectionManager.getClient());
 
+        // First, verify we have data to monitor
+        System.out.println("\n--- Verifying database data...");
+        reportingService.sampleVehicleData();
+
+        // Create scheduler for periodic stats reporting
+        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+
+        try {
             // Create and start the monitoring service
             System.out.println("\n=== Starting monitoring service...");
-            MonitorService monitor = new MonitorService(connectionService);
+            MonitorService monitor = new MonitorService(connectionManager);
 
             // Set quiet mode to true to suppress individual alert output
             monitor.setQuietMode(true);
 
-            monitor.startMonitoring(60); // Check every 60 seconds
+            // Start monitoring (check every 60 seconds)
+            monitor.startMonitoring(60);
 
             // Schedule a task to regularly print monitoring statistics
             System.out.println("\n=== Setting up statistics reporting...");
@@ -59,37 +81,53 @@ public class ServiceMonitorExample {
             // Stop the monitor and scheduler
             System.out.println("\n=== Stopping monitoring service...");
             monitor.stopMonitoring();
-
-            scheduler.shutdown();
-            try {
-                if (!scheduler.awaitTermination(10, TimeUnit.SECONDS)) {
-                    scheduler.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                scheduler.shutdownNow();
-                Thread.currentThread().interrupt();
-            }
+            shutdownScheduler(scheduler);
 
             // Display final results
-            List<MonitorService.ServiceAlert> alerts = monitor.getRecentAlerts();
-            Map<String, Integer> alertCounts = monitor.getAlertCounts();
+            displayFinalResults(monitor, reportingService);
 
-            System.out.println("\n=== Monitoring Results ===");
-            System.out.println("Total alerts detected: " +
-                    alertCounts.values().stream().mapToInt(Integer::intValue).sum());
-
-            // Display alert statistics
-            reportingService.displayAlertStatistics(alertCounts);
-
-            if (!alerts.isEmpty()) {
-                System.out.println("\nSample alerts:");
-                reportingService.displayRecentAlerts(alerts.stream().limit(5).collect(Collectors.toList()));
-            }
-
-            System.out.println("\nExample completed successfully!");
-        } catch (Exception e) {
-            System.err.println("Error during monitor example: " + e.getMessage());
-            e.printStackTrace();
+        } finally {
+            // Ensure scheduler is shut down if an exception occurs
+            shutdownScheduler(scheduler);
         }
+    }
+
+    /**
+     * Properly shut down the scheduler.
+     */
+    private static void shutdownScheduler(ScheduledExecutorService scheduler) {
+        scheduler.shutdown();
+        try {
+            if (!scheduler.awaitTermination(10, TimeUnit.SECONDS)) {
+                scheduler.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            scheduler.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
+     * Display the final monitoring results.
+     */
+    private static void displayFinalResults(MonitorService monitor, ReportingService reportingService) {
+        List<ServiceAlert> alerts = monitor.getRecentAlerts();
+        Map<String, Integer> alertCounts = monitor.getAlertCounts();
+
+        System.out.println("\n=== Monitoring Results ===");
+        System.out.println("Total alerts detected: " +
+                alertCounts.values().stream().mapToInt(Integer::intValue).sum());
+
+        // Display alert statistics
+        reportingService.displayAlertStatistics(alertCounts);
+
+        if (!alerts.isEmpty()) {
+            System.out.println("\nSample alerts:");
+            reportingService.displayRecentAlerts(
+                    alerts.stream().limit(5).collect(java.util.stream.Collectors.toList())
+            );
+        }
+
+        System.out.println("\nExample completed successfully!");
     }
 }

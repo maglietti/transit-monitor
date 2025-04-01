@@ -1,5 +1,7 @@
 package com.example.transit.service;
 
+import com.example.transit.config.IgniteConnectionManager;
+import com.example.transit.model.ServiceAlert;
 import org.apache.ignite.client.IgniteClient;
 
 import java.time.LocalDateTime;
@@ -15,9 +17,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Monitors vehicle positions for potential service disruptions.
- * This class periodically checks for various conditions that might
- * indicate issues in the transit system, such as delayed vehicles,
- * bunching, or insufficient route coverage.
+ * Periodically checks for various conditions that might indicate issues
+ * in the transit system, such as delayed vehicles, bunching, or
+ * insufficient route coverage.
  */
 public class MonitorService {
     // Thresholds for monitoring conditions
@@ -34,28 +36,19 @@ public class MonitorService {
     // Statistics tracking
     private final Map<String, AtomicInteger> alertCounts = new HashMap<>();
     private final List<ServiceAlert> recentAlerts = new ArrayList<>();
-    private final int maxRecentAlerts = 100;
 
     // Quiet Mode
     private boolean quietMode = false;
-    public void setQuietMode(boolean quietMode) {
-        this.quietMode = quietMode;
-    }
 
     /**
      * Creates a new monitoring service connected to the Ignite cluster.
      *
-     * @param connectionService The service providing the Ignite client connection
+     * @param connectionManager The manager providing the Ignite client connection
      */
-    public MonitorService(ConnectService connectionService) {
-        this.client = connectionService.getClient();
-        initializeAlertCounters();
-    }
+    public MonitorService(IgniteConnectionManager connectionManager) {
+        this.client = connectionManager.getClient();
 
-    /**
-     * Initializes alert counters for each type of monitored condition.
-     */
-    private void initializeAlertCounters() {
+        // Initialize alert counters
         alertCounts.put("DELAYED_VEHICLE", new AtomicInteger(0));
         alertCounts.put("VEHICLE_BUNCHING", new AtomicInteger(0));
         alertCounts.put("LOW_ROUTE_COVERAGE", new AtomicInteger(0));
@@ -63,39 +56,26 @@ public class MonitorService {
     }
 
     /**
-     * Starts monitoring for service disruptions by polling the database at regular
-     * intervals.
+     * Sets quiet mode to suppress individual alert output.
+     */
+    public void setQuietMode(boolean quietMode) {
+        this.quietMode = quietMode;
+    }
+
+    /**
+     * Starts monitoring for service disruptions.
      *
      * @param intervalSeconds The polling interval in seconds
      */
     public void startMonitoring(int intervalSeconds) {
         System.out.println("--- Starting service disruption monitoring (polling every " + intervalSeconds + " seconds)");
 
-        // Schedule all monitoring tasks
+        // Schedule all monitoring tasks with different initial delays to spread out processing
         scheduler.scheduleAtFixedRate(
-                this::checkForDelayedVehicles,
+                this::performMonitoring,
                 5,
                 intervalSeconds,
                 TimeUnit.SECONDS);
-
-        scheduler.scheduleAtFixedRate(
-                this::checkForVehicleBunching,
-                10,
-                intervalSeconds,
-                TimeUnit.SECONDS);
-
-        scheduler.scheduleAtFixedRate(
-                this::checkForLowRouteCoverage,
-                15,
-                intervalSeconds,
-                TimeUnit.SECONDS);
-
-        scheduler.scheduleAtFixedRate(
-                this::checkForOfflineVehicles,
-                20,
-                intervalSeconds,
-                TimeUnit.SECONDS);
-
     }
 
     /**
@@ -115,6 +95,16 @@ public class MonitorService {
     }
 
     /**
+     * Performs all monitoring checks in one method.
+     */
+    private void performMonitoring() {
+        checkForDelayedVehicles();
+        checkForVehicleBunching();
+        checkForLowRouteCoverage();
+        checkForOfflineVehicles();
+    }
+
+    /**
      * Checks for vehicles that have been stopped for longer than the threshold.
      */
     private void checkForDelayedVehicles() {
@@ -128,10 +118,10 @@ public class MonitorService {
                     "    v.longitude, " +
                     "    v.time_stamp, " +
                     "    TIMESTAMPDIFF(MINUTE, v.time_stamp, CURRENT_TIMESTAMP) as stopped_minutes " +
-                    "FROM vehicle_positions v " +
+                    "FROM VehiclePosition v " +
                     "JOIN (" +
                     "    SELECT vehicle_id, MAX(time_stamp) as latest_ts " +
-                    "    FROM vehicle_positions " +
+                    "    FROM VehiclePosition " +
                     "    GROUP BY vehicle_id " +
                     ") l ON v.vehicle_id = l.vehicle_id AND v.time_stamp = l.latest_ts " +
                     "WHERE " +
@@ -149,7 +139,6 @@ public class MonitorService {
 
                 String vehicleId = row.stringValue("vehicle_id");
                 String routeId = row.stringValue("route_id");
-                LocalDateTime timestamp = row.value("time_stamp");
                 int stoppedMinutes = row.intValue("stopped_minutes");
 
                 // Create and record the alert
@@ -167,7 +156,6 @@ public class MonitorService {
 
                 // Only log the alert if not in quiet mode
                 if (!quietMode) {
-                    // Log the alert
                     System.out.println("[" + LocalDateTime.now().format(timeFormatter) +
                             "] ALERT: " + alert.getMessage());
                 }
@@ -178,7 +166,6 @@ public class MonitorService {
             }
         } catch (Exception e) {
             System.err.println("Error checking for delayed vehicles: " + e.getMessage());
-            e.printStackTrace();
         }
     }
 
@@ -187,14 +174,13 @@ public class MonitorService {
      */
     private void checkForVehicleBunching() {
         try {
-            // This query finds pairs of vehicles on the same route that are close to each
-            // other
+            // This query finds pairs of vehicles on the same route that are close to each other
             String querySql = "WITH latest_positions AS (" +
                     "    SELECT v.vehicle_id, v.route_id, v.latitude, v.longitude " +
-                    "    FROM vehicle_positions v " +
+                    "    FROM VehiclePosition v " +
                     "    JOIN (" +
                     "        SELECT vehicle_id, MAX(time_stamp) as latest_ts " +
-                    "        FROM vehicle_positions " +
+                    "        FROM VehiclePosition " +
                     "        GROUP BY vehicle_id " +
                     "    ) l ON v.vehicle_id = l.vehicle_id AND v.time_stamp = l.latest_ts " +
                     "    WHERE v.current_status = 'IN_TRANSIT_TO' " + // Only consider moving vehicles
@@ -207,8 +193,7 @@ public class MonitorService {
                     "    a.longitude as lon1, " +
                     "    b.latitude as lat2, " +
                     "    b.longitude as lon2, " +
-                    "    SQRT(POWER(a.latitude - b.latitude, 2) + POWER(a.longitude - b.longitude, 2)) * 111 as distance_km "
-                    +
+                    "    SQRT(POWER(a.latitude - b.latitude, 2) + POWER(a.longitude - b.longitude, 2)) * 111 as distance_km " +
                     "FROM latest_positions a " +
                     "JOIN latest_positions b ON a.route_id = b.route_id AND a.vehicle_id < b.vehicle_id " +
                     "WHERE SQRT(POWER(a.latitude - b.latitude, 2) + POWER(a.longitude - b.longitude, 2)) * 111 < ? " +
@@ -242,7 +227,6 @@ public class MonitorService {
 
                 // Only log the alert if not in quiet mode
                 if (!quietMode) {
-                    // Log the alert
                     System.out.println("[" + LocalDateTime.now().format(timeFormatter) +
                             "] ALERT: " + alert.getMessage());
                 }
@@ -253,7 +237,6 @@ public class MonitorService {
             }
         } catch (Exception e) {
             System.err.println("Error checking for vehicle bunching: " + e.getMessage());
-            e.printStackTrace();
         }
     }
 
@@ -264,14 +247,13 @@ public class MonitorService {
         try {
             String querySql = "WITH active_vehicles AS (" +
                     "    SELECT DISTINCT v.route_id, v.vehicle_id " +
-                    "    FROM vehicle_positions v " +
+                    "    FROM VehiclePosition v " +
                     "    JOIN (" +
                     "        SELECT vehicle_id, MAX(time_stamp) as latest_ts " +
-                    "        FROM vehicle_positions " +
+                    "        FROM VehiclePosition " +
                     "        GROUP BY vehicle_id " +
                     "    ) l ON v.vehicle_id = l.vehicle_id AND v.time_stamp = l.latest_ts " +
-                    "    WHERE TIMESTAMPDIFF(MINUTE, v.time_stamp, CURRENT_TIMESTAMP) < 15" + // Only consider recent
-                                                                                              // positions
+                    "    WHERE TIMESTAMPDIFF(MINUTE, v.time_stamp, CURRENT_TIMESTAMP) < 15" + // Only consider recent positions
                     ") " +
                     "SELECT route_id, COUNT(*) as vehicle_count " +
                     "FROM active_vehicles " +
@@ -304,7 +286,6 @@ public class MonitorService {
 
                 // Only log the alert if not in quiet mode
                 if (!quietMode) {
-                    // Log the alert
                     System.out.println("[" + LocalDateTime.now().format(timeFormatter) +
                             "] ALERT: " + alert.getMessage());
                 }
@@ -315,7 +296,6 @@ public class MonitorService {
             }
         } catch (Exception e) {
             System.err.println("Error checking for low route coverage: " + e.getMessage());
-            e.printStackTrace();
         }
     }
 
@@ -326,20 +306,19 @@ public class MonitorService {
         try {
             String querySql = "WITH latest_timestamps AS (" +
                     "    SELECT vehicle_id, MAX(time_stamp) as latest_ts " +
-                    "    FROM vehicle_positions " +
+                    "    FROM VehiclePosition " +
                     "    GROUP BY vehicle_id " +
                     "), active_routes AS (" +
                     "    SELECT DISTINCT route_id " +
-                    "    FROM vehicle_positions v " +
+                    "    FROM VehiclePosition v " +
                     "    JOIN latest_timestamps l ON v.vehicle_id = l.vehicle_id AND v.time_stamp = l.latest_ts " +
                     "    WHERE TIMESTAMPDIFF(MINUTE, v.time_stamp, CURRENT_TIMESTAMP) < 15" +
                     ") " +
                     "SELECT v.vehicle_id, v.route_id, v.latitude, v.longitude, v.time_stamp, " +
                     "       TIMESTAMPDIFF(MINUTE, v.time_stamp, CURRENT_TIMESTAMP) as offline_minutes " +
-                    "FROM vehicle_positions v " +
+                    "FROM VehiclePosition v " +
                     "JOIN latest_timestamps l ON v.vehicle_id = l.vehicle_id AND v.time_stamp = l.latest_ts " +
-                    "WHERE v.route_id IN (SELECT route_id FROM active_routes) " + // Only check routes with some active
-                                                                                  // vehicles
+                    "WHERE v.route_id IN (SELECT route_id FROM active_routes) " + // Only check routes with some active vehicles
                     "  AND TIMESTAMPDIFF(MINUTE, v.time_stamp, CURRENT_TIMESTAMP) >= ? " +
                     "ORDER BY offline_minutes DESC";
 
@@ -369,7 +348,6 @@ public class MonitorService {
 
                 // Only log the alert if not in quiet mode
                 if (!quietMode) {
-                    // Log the alert
                     System.out.println("[" + LocalDateTime.now().format(timeFormatter) +
                             "] ALERT: " + alert.getMessage());
                 }
@@ -380,7 +358,6 @@ public class MonitorService {
             }
         } catch (Exception e) {
             System.err.println("Error checking for offline vehicles: " + e.getMessage());
-            e.printStackTrace();
         }
     }
 
@@ -395,10 +372,10 @@ public class MonitorService {
         recentAlerts.add(alert);
 
         // Trim list if needed
+        int maxRecentAlerts = 100;
         while (recentAlerts.size() > maxRecentAlerts) {
             recentAlerts.remove(0);
         }
-
     }
 
     /**
@@ -415,64 +392,5 @@ public class MonitorService {
         Map<String, Integer> counts = new HashMap<>();
         alertCounts.forEach((type, count) -> counts.put(type, count.get()));
         return counts;
-    }
-
-    /**
-     * Class representing a service alert in the monitoring system.
-     */
-    public static class ServiceAlert {
-        private final String type;
-        private final String message;
-        private final String routeId;
-        private final String vehicleId;
-        private final double latitude;
-        private final double longitude;
-        private final int severity;
-        private final LocalDateTime timestamp;
-
-        public ServiceAlert(String type, String message, String routeId, String vehicleId,
-                double latitude, double longitude, int severity) {
-            this.type = type;
-            this.message = message;
-            this.routeId = routeId;
-            this.vehicleId = vehicleId;
-            this.latitude = latitude;
-            this.longitude = longitude;
-            this.severity = severity;
-            this.timestamp = LocalDateTime.now();
-        }
-
-        // Getters
-        public String getType() {
-            return type;
-        }
-
-        public String getMessage() {
-            return message;
-        }
-
-        public String getRouteId() {
-            return routeId;
-        }
-
-        public String getVehicleId() {
-            return vehicleId;
-        }
-
-        public double getLatitude() {
-            return latitude;
-        }
-
-        public double getLongitude() {
-            return longitude;
-        }
-
-        public int getSeverity() {
-            return severity;
-        }
-
-        public LocalDateTime getTimestamp() {
-            return timestamp;
-        }
     }
 }

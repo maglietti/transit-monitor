@@ -1,5 +1,8 @@
 package com.example.transit.service;
 
+import com.example.transit.model.IngestStats;
+import com.example.transit.model.ServiceAlert;
+import com.example.transit.model.VehiclePosition;
 import com.example.transit.util.TerminalUtil;
 import org.apache.ignite.client.IgniteClient;
 
@@ -8,14 +11,18 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
-import java.util.concurrent.atomic.AtomicInteger;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
- * Service class that centralizes reporting and display functionality.
- * This class handles formatting and displaying data from various services
- * in a consistent manner across examples and the main application.
+ * Service class for reporting and display functionality.
+ * Centralizes formatting and displaying data from various services.
  */
-public class ReportService {
+public class ReportingService {
+
+    private static final Logger logger = LogManager.getLogger(ReportingService.class);
+
     private final IgniteClient client;
     private final Map<String, Integer> routeCountHistory = new HashMap<>();
     private final Map<String, Long> statusCountHistory = new HashMap<>();
@@ -23,27 +30,22 @@ public class ReportService {
     private static final DateTimeFormatter DATETIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     /**
-     * Creates a new reporting service with an Ignite client connection.
-     *
-     * @param client The Ignite client for data queries
+     * Creates a new reporting service with an Ignite client.
      */
-    public ReportService(IgniteClient client) {
+    public ReportingService(IgniteClient client) {
         this.client = client;
     }
 
     /**
      * Formats vehicle position data for display.
-     *
-     * @param position Vehicle position map
-     * @return Formatted string representation
      */
-    public String formatVehicleData(Map<String, Object> position) {
+    public String formatVehicleData(VehiclePosition position) {
         return String.format("+++ Vehicle %s on route %s at (%.6f, %.6f) - Status: %s",
-                position.get("vehicle_id"),
-                position.get("route_id"),
-                position.get("latitude"),
-                position.get("longitude"),
-                position.get("current_status"));
+                position.getVehicleId(),
+                position.getRouteId(),
+                position.getLatitude(),
+                position.getLongitude(),
+                position.getCurrentStatus());
     }
 
     /**
@@ -52,7 +54,7 @@ public class ReportService {
     public void displayActiveVehicles() {
         try {
             String sql = "SELECT route_id, COUNT(DISTINCT vehicle_id) as vehicle_count " +
-                    "FROM vehicle_positions " +
+                    "FROM VehiclePosition " +
                     "WHERE TIMESTAMPDIFF(MINUTE, time_stamp, CURRENT_TIMESTAMP) <= 15 " +
                     "GROUP BY route_id ORDER BY vehicle_count DESC LIMIT 10";
 
@@ -86,7 +88,7 @@ public class ReportService {
     public void displayVehicleStatuses() {
         try {
             String sql = "SELECT current_status, COUNT(*) as status_count " +
-                    "FROM vehicle_positions " +
+                    "FROM VehiclePosition " +
                     "WHERE TIMESTAMPDIFF(MINUTE, time_stamp, CURRENT_TIMESTAMP) <= 15 " +
                     "GROUP BY current_status";
 
@@ -120,10 +122,8 @@ public class ReportService {
 
     /**
      * Displays data ingestion status.
-     *
-     * @param stats The ingestion statistics from DataIngestionService
      */
-    public void displayIngestionStatus(IngestService.IngestStats stats) {
+    public void displayIngestionStatus(IngestStats stats) {
         String status = stats.isRunning() ? TerminalUtil.ANSI_GREEN + "Running" : TerminalUtil.ANSI_RED + "Stopped";
 
         System.out.println("• Status: " + status + TerminalUtil.ANSI_RESET);
@@ -148,10 +148,8 @@ public class ReportService {
 
     /**
      * Displays recent service alerts.
-     *
-     * @param alerts List of service alerts from MonitoringService
      */
-    public void displayRecentAlerts(List<MonitorService.ServiceAlert> alerts) {
+    public void displayRecentAlerts(List<ServiceAlert> alerts) {
         if (alerts.isEmpty()) {
             System.out.println(TerminalUtil.ANSI_GREEN + "No active alerts" + TerminalUtil.ANSI_RESET);
             return;
@@ -175,8 +173,6 @@ public class ReportService {
 
     /**
      * Displays alert statistics.
-     *
-     * @param alertCounts Map of alert types to counts from MonitoringService
      */
     public void displayAlertStatistics(Map<String, Integer> alertCounts) {
         if (alertCounts.isEmpty()) {
@@ -209,7 +205,7 @@ public class ReportService {
     public void displaySystemStatistics() {
         try {
             // Total records
-            var countResult = client.sql().execute(null, "SELECT COUNT(*) as total FROM vehicle_positions");
+            var countResult = client.sql().execute(null, "SELECT COUNT(*) as total FROM VehiclePosition");
             if (countResult.hasNext()) {
                 long total = countResult.next().longValue("total");
                 System.out.println("• Total records: " + TerminalUtil.ANSI_BOLD + total + TerminalUtil.ANSI_RESET);
@@ -217,7 +213,7 @@ public class ReportService {
 
             // Unique vehicles
             var vehiclesResult = client.sql().execute(null,
-                    "SELECT COUNT(DISTINCT vehicle_id) as total FROM vehicle_positions");
+                    "SELECT COUNT(DISTINCT vehicle_id) as total FROM VehiclePosition");
             if (vehiclesResult.hasNext()) {
                 long total = vehiclesResult.next().longValue("total");
                 System.out.println("• Unique vehicles: " + TerminalUtil.ANSI_BOLD + total + TerminalUtil.ANSI_RESET);
@@ -225,7 +221,7 @@ public class ReportService {
 
             // Time span
             var timeResult = client.sql().execute(null,
-                    "SELECT MIN(time_stamp) as oldest, MAX(time_stamp) as newest FROM vehicle_positions");
+                    "SELECT MIN(time_stamp) as oldest, MAX(time_stamp) as newest FROM VehiclePosition");
             if (timeResult.hasNext()) {
                 var row = timeResult.next();
                 Object oldest = row.value("oldest");
@@ -254,13 +250,11 @@ public class ReportService {
 
     /**
      * Displays connection status.
-     *
-     * @param ingestionStats Ingestion service statistics
      */
-    public void displayConnectionStatus(IngestService.IngestStats ingestionStats) {
+    public void displayConnectionStatus(IngestStats ingestionStats) {
         try {
             System.out.println("• Ignite cluster: " + TerminalUtil.ANSI_GREEN + "Connected" + TerminalUtil.ANSI_RESET);
-            System.out.println("• Database: vehicle_positions table accessible");
+            System.out.println("• Database: VehiclePosition table accessible");
 
             String ingestionStatus = ingestionStats.isRunning() ? TerminalUtil.ANSI_GREEN + "Active"
                     : TerminalUtil.ANSI_RED + "Inactive";
@@ -273,32 +267,30 @@ public class ReportService {
     }
 
     /**
-     * Analyzes vehicle position data and displays useful statistics.
-     *
-     * @param positions List of vehicle position maps to analyze
+     * Analyzes vehicle position data and displays statistics.
      */
-    public void analyzeVehicleData(List<Map<String, Object>> positions) {
+    public void analyzeVehicleData(List<VehiclePosition> positions) {
         // Count unique routes and vehicles
         long uniqueRoutes = positions.stream()
-                .map(p -> (String) p.get("route_id"))
+                .map(VehiclePosition::getRouteId)
                 .distinct()
                 .count();
 
         long uniqueVehicles = positions.stream()
-                .map(p -> (String) p.get("vehicle_id"))
+                .map(VehiclePosition::getVehicleId)
                 .distinct()
                 .count();
 
-        // Count vehicles by status
+// Count vehicles by status
         Map<String, Long> statusCounts = positions.stream()
                 .collect(java.util.stream.Collectors.groupingBy(
-                        p -> (String) p.get("current_status"),
+                        VehiclePosition::getCurrentStatus,
                         java.util.stream.Collectors.counting()));
 
-        // Find top 5 routes by vehicle count
+// Find top 5 routes by vehicle count
         Map<String, Long> routeCounts = positions.stream()
                 .collect(java.util.stream.Collectors.groupingBy(
-                        p -> (String) p.get("route_id"),
+                        VehiclePosition::getRouteId,
                         java.util.stream.Collectors.counting()));
 
         List<Map.Entry<String, Long>> topRoutes = routeCounts.entrySet().stream()
@@ -316,30 +308,29 @@ public class ReportService {
                 String.format("%.1f", (count * 100.0 / positions.size())) + "%)"));
 
         System.out.println("\nTop 5 routes by vehicle count:");
-        for (int i = 0; i < topRoutes.size(); i++) {
-            Map.Entry<String, Long> route = topRoutes.get(i);
+        for (Map.Entry<String, Long> route : topRoutes) {
             System.out.println("• Route " + route.getKey() + ": " +
                     route.getValue() + " vehicles");
         }
 
         // Calculate geographic bounds
         double minLat = positions.stream()
-                .mapToDouble(p -> ((Number) p.get("latitude")).doubleValue())
+                .mapToDouble(VehiclePosition::getLatitude)
                 .min()
                 .orElse(0);
 
         double maxLat = positions.stream()
-                .mapToDouble(p -> ((Number) p.get("latitude")).doubleValue())
+                .mapToDouble(VehiclePosition::getLatitude)
                 .max()
                 .orElse(0);
 
         double minLon = positions.stream()
-                .mapToDouble(p -> ((Number) p.get("longitude")).doubleValue())
+                .mapToDouble(VehiclePosition::getLongitude)
                 .min()
                 .orElse(0);
 
         double maxLon = positions.stream()
-                .mapToDouble(p -> ((Number) p.get("longitude")).doubleValue())
+                .mapToDouble(VehiclePosition::getLongitude)
                 .max()
                 .orElse(0);
 
@@ -349,37 +340,33 @@ public class ReportService {
     }
 
     /**
-     * Verifies the existence and integrity of vehicle position data in Ignite.
-     * This method will:
-     * 1. Check if the table exists and count records
-     * 2. Display sample records
-     * 3. Show route statistics
+     * Verifies and displays sample vehicle data from the database.
      */
     public void sampleVehicleData() {
-        System.out.println("Verifying data in vehicle_positions table...");
+        System.out.println("--- Verifying data in VehiclePosition table");
 
         try {
             // Count records using SQL query
-            String countSql = "SELECT COUNT(*) FROM vehicle_positions";
+            String countSql = "SELECT COUNT(*) FROM VehiclePosition";
             try (var countResult = client.sql().execute(null, countSql)) {
                 long recordCount = 0;
 
                 if (countResult.hasNext()) {
                     recordCount = countResult.next().longValue(0);
-                    System.out.println("Table contains " + recordCount + " records");
+                    System.out.println("<<< Table contains " + recordCount + " records");
                 } else {
-                    System.out.println("No results returned from count query.");
+                    System.out.println("<<< No results returned from count query.");
                 }
 
                 if (recordCount == 0) {
-                    System.out.println("Table is empty. Start the ingestion service to load some data.");
+                    System.out.println("--- Table is empty. Start the ingestion service to load some data.");
                     return;
                 }
             }
 
             // Sample recent records
             System.out.println("\nSample records (most recent):");
-            String sampleSql = "SELECT * FROM vehicle_positions ORDER BY time_stamp DESC LIMIT 3";
+            String sampleSql = "SELECT * FROM VehiclePosition ORDER BY time_stamp DESC LIMIT 3";
 
             try (var sampleResult = client.sql().execute(null, sampleSql)) {
                 while (sampleResult.hasNext()) {
@@ -393,14 +380,14 @@ public class ReportService {
                     System.out.println("Vehicle: " + vehicleId +
                             ", Route: " + routeId +
                             ", Status: " + status +
-                            ", Time: " + timestamp.format(DATETIME_FORMATTER));
+                            ", Time: " + (timestamp != null ? timestamp.format(DATETIME_FORMATTER) : "null"));
                 }
             }
 
             // Get route statistics
             System.out.println("\nTop routes by number of records:");
             String routeStatsSql = "SELECT route_id, COUNT(*) as total " +
-                    "FROM vehicle_positions " +
+                    "FROM VehiclePosition " +
                     "GROUP BY route_id " +
                     "ORDER BY total DESC " +
                     "LIMIT 5";
@@ -416,15 +403,12 @@ public class ReportService {
             }
 
         } catch (Exception e) {
-            System.err.println("Error verifying data: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error verifying data: {}", e.getMessage());
         }
     }
 
     /**
      * Prints a dashboard header.
-     *
-     * @param width The width of the terminal
      */
     public void printDashboardHeader(int width) {
         String headerText = "TRANSIT MONITORING DASHBOARD";
@@ -439,8 +423,6 @@ public class ReportService {
 
     /**
      * Prints the dashboard footer.
-     *
-     * @param refreshSeconds The dashboard refresh interval in seconds
      */
     public void printDashboardFooter(int refreshSeconds) {
         System.out.println();
@@ -452,9 +434,6 @@ public class ReportService {
 
     /**
      * Get the title for a specific dashboard view type.
-     *
-     * @param viewType The view type identifier
-     * @return String title for the view
      */
     public String getViewTitle(int viewType) {
         switch (viewType) {

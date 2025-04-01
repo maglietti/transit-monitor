@@ -1,187 +1,149 @@
-# Transit Monitor System
-
-> [!note]
-> This repository is the companion to the Your First Ignite App with Java. The tutorial walks you through building a real-time transit monitoring system using Apache Ignite 3.
-
-A real-time public transit monitoring system that tracks vehicle positions, detects service disruptions, and provides a live dashboard of transit operations.
+# Transit Monitoring System with Apache Ignite 3
 
 ## Overview
 
-The Transit Monitoring System is a Java application that connects to a GTFS-realtime feed to ingest vehicle position data and monitor transit operations for potential service disruptions. The system detects common issues such as vehicle bunching, delayed vehicles, offline vehicles, and routes with insufficient coverage.
+This project demonstrates building a real-time transit monitoring application using Apache Ignite 3, showcasing distributed data processing, SQL querying, and continuous monitoring capabilities.
+
+The application fetches real-time vehicle position data from GTFS (General Transit Feed Specification) feeds, stores it in a distributed Ignite database, and provides a live monitoring dashboard that tracks:
+
+- Vehicle positions
+- Route coverage
+- Service disruptions
+- System performance
 
 ## Features
 
-- **Real-time data ingestion**: Connects to GTFS-realtime feeds to retrieve vehicle position data
-- **Database storage**: Stores transit data in **Apache Ignite 3** for fast querying and analysis
-- **Service monitoring**: Automatically detects potential service disruptions:
-  - Delayed vehicles (stopped for too long)
-  - Vehicle bunching (vehicles on same route too close together)
-  - Routes with insufficient coverage
-  - Offline vehicles (not reporting positions)
-- **Live dashboard**: Console-based dashboard with three rotating views:
-  - Summary view (active vehicles by route, status distribution)
-  - Alerts view (recent service alerts and statistics)
-  - System details view (system statistics, monitoring thresholds)
+- Real-time transit data ingestion
+- Distributed data storage with Apache Ignite 3
+- SQL-based analytics and monitoring
+- Console dashboard with multiple views
+- Automated service disruption detection
 
 ## Prerequisites
 
 - Java 11 or later
-- Apache Ignite 3 cluster (running on localhost ports 10800-10802)
-- GTFS-realtime feed access (API token required)
-- Docker and Docker Compose (for running the Ignite cluster)
+- Maven 3.6+
+- Docker and Docker Compose
+- API key from a GTFS provider (e.g., 511.org)
 
-## Configuration
+## Getting Started
 
-### Environment Variables
-
-Copy the `.env.example` file to `.env` and update the variables:
-
-```
-API_TOKEN=your_gtfs_api_token
-GTFS_BASE_URL=https://example.com/gtfs-rt/vehicle-positions
-GTFS_AGENCY=agency_id
-```
-
-### Apache Ignite Cluster Setup
-
-The application requires an Apache Ignite 3 cluster. You can easily start a local 3-node cluster using the provided Docker Compose file:
+### 1. Clone the Repository
 
 ```bash
-# Start the Ignite cluster
-docker-compose up -d
-
-# Check the status of the nodes
-docker-compose ps
+git clone https://github.com/yourusername/transit-monitor.git
+cd transit-monitor
 ```
 
-Start the Ignite CLI in Docker:
+### 2. Configure Environment
+
+Copy the `.env.example` to `.env` and add your GTFS API token:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and replace `your_token_here` with a valid GTFS API token.
+
+### 3. Start Ignite Cluster
+
+```bash
+docker compose up -d
+```
+
+### 4. Initialize the cluster
 
 ```bash
 docker run --rm -it --network=host -e LANG=C.UTF-8 -e LC_ALL=C.UTF-8 apacheignite/ignite:3.0.0 cli
-```
-
-Inside the CLI, connect to one of the nodes:
-
-```bash
 connect http://localhost:10300
-```
-
-Initialize the cluster with a name and metastorage group:
-
-```bash
 cluster init --name=ignite3 --metastorage-group=node1,node2,node3
-```
-
-Exit the CLI by typing `exit` or pressing Ctrl+D
-
-> [!warning]
-> The initialization step MUST be performed for a new cluster.
-
-To stop the cluster:
-
-```bash
-docker-compose down
-```
-
-## Building
-
-```bash
-# Compile the application
-mvn clean package
-
-# Run the application
-java -jar target/transit-monitor-1.0.jar
+exit
 ```
 
 ## Example Applications
 
-The repository includes several example applications to demonstrate specific components of the system:
+The project includes several example applications to demonstrate different features:
 
-### ConnectExample
-
-Demonstrates connectivity to the Apache Ignite cluster and displays cluster information.
+### Connection Example
 
 ```bash
-java -cp target/transit-monitor-1.0.jar com.example.transit.examples.ConnectExample
+mvn compile exec:java@connect-example
 ```
 
-This example:
-
-- Connects to the Ignite cluster
-- Displays cluster topology information
-- Shows connection details and retry policies
-- Lists available tables in the database
-
-### SchemaSetupExample
-
-Demonstrates database schema creation and verification.
+### Schema Example
 
 ```bash
-java -cp target/transit-monitor-1.0.jar com.example.transit.examples.SchemaSetupExample
+mvn compile exec:java@schema-setup-example
 ```
 
-This example:
-
-- Creates the required database table for vehicle positions
-- Inserts test data to verify write operations
-- Queries the data to verify read operations
-- Deletes the test data and verifies deletion
-
-### GtfsFeedExample
-
-Demonstrates connecting to a GTFS-realtime feed and retrieving vehicle positions.
+### GTFS Feed Example
 
 ```bash
-java -cp target/transit-monitor-1.0.jar com.example.transit.examples.GtfsFeedExample
+mvn compile exec:java@gtfs-feed-example
 ```
 
-This example:
-
-- Connects to the configured GTFS feed
-- Retrieves vehicle position data
-- Displays sample data and statistics
-- Stores the data in the database
-
-### IngestExample
-
-Demonstrates the continuous data ingestion pipeline.
+### Ingestion Example
 
 ```bash
-java -cp target/transit-monitor-1.0.jar com.example.transit.examples.IngestExample
+mvn compile exec:java@ingest-example
 ```
 
-This example:
-
-- Sets up the database schema
-- Starts the data ingestion service
-- Runs for 45 seconds, fetching data every 15 seconds
-- Displays ingestion statistics
-- Verifies the data was stored correctly
-
-### ServiceMonitorExample
-
-Demonstrates the service monitoring functionality.
+### Service Monitor Example
 
 ```bash
-java -cp target/transit-monitor-1.0.jar com.example.transit.examples.ServiceMonitorExample
+mvn compile exec:java@service-monitor-example
 ```
 
-This example:
+### Run the Service Monitor App
 
-- Verifies the database contains vehicle position data
-- Starts the monitoring service to detect service disruptions
-- Displays alert statistics every 30 seconds
-- Shows sample service alerts when stopped
+```bash
+mvn compile exec:java@run-app
+```
 
-## Troubleshooting
+## Project Structure
 
-Common issues and solutions:
+- `src/main/java/com/example/transit/`
+  - `app/`: Main application
+  - `config/`: Configuration management
+  - `examples/`: Demonstration applications
+  - `model/`: Data models
+  - `service/`: Business logic services
+  - `util/`: Utility classes
 
-- **Connection failures**: Verify Ignite cluster is running on the expected ports
-- **Empty data**: Check API token and agency ID in the .env file
-- **Schema errors**: Make sure Ignite is properly configured with SQL support
-- **Monitoring not detecting issues**: Verify thresholds in MonitorService
+## Documentation
+
+- [Introduction](docs/01-introduction.md)
+- [Project Setup](docs/02-project-setup.md)
+- [Understanding GTFS](docs/03-understanding-gtfs.md)
+- [GTFS Client](docs/04-gtfs-client.md)
+- [Data Ingestion](docs/05-data-ingestion.md)
+- [SQL Queries](docs/06-implementing-queries.md)
+- [Service Monitoring](docs/07-continuous-query.md)
+- [Application Integration](docs/08-putting-together.md)
+
+## Technologies
+
+- Apache Ignite 3
+- Java
+- Maven
+- Docker
+- GTFS-realtime
+- Protocol Buffers
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
 ## License
 
 [Apache License 2.0](LICENSE)
+
+## Acknowledgments
+
+- Apache Ignite Community
+- GTFS Specification Developers
+- Transit Agencies Providing Open Data

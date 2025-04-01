@@ -12,6 +12,8 @@
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
         <ignite.version>3.0.0</ignite.version>
+        <log4j.version>2.20.0</log4j.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
     <dependencies>
@@ -29,11 +31,23 @@
             <version>0.0.8</version>
         </dependency>
 
-        <!-- Logging -->
+        <!-- Log4j2 API and Implementation -->
         <dependency>
-            <groupId>ch.qos.logback</groupId>
-            <artifactId>logback-classic</artifactId>
-            <version>1.2.11</version>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+            <version>${log4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>${log4j.version}</version>
+        </dependency>
+
+        <!-- JUL Bridge: Routes Ignite's java.util.logging to Log4j2 -->
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-jul</artifactId>
+            <version>${log4j.version}</version>
         </dependency>
 
         <!-- Configuration -->
@@ -46,6 +60,7 @@
 
     <build>
         <plugins>
+            <!-- Maven Shade Plugin for creating executable jar -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
@@ -76,6 +91,76 @@
                                     </excludes>
                                 </filter>
                             </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Maven Exec Plugin for executing examples -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <!-- Main App Execution -->
+                    <execution>
+                        <id>run-app</id>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>com.example.transit.app.TransitMonitorApp</mainClass>
+                        </configuration>
+                    </execution>
+
+                    <!-- Example Executions -->
+                    <execution>
+                        <id>connect-example</id>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>com.example.transit.examples.ConnectExample</mainClass>
+                        </configuration>
+                    </execution>
+
+                    <execution>
+                        <id>gtfs-feed-example</id>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>com.example.transit.examples.GtfsFeedExample</mainClass>
+                        </configuration>
+                    </execution>
+
+                    <execution>
+                        <id>schema-setup-example</id>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>com.example.transit.examples.SchemaSetupExample</mainClass>
+                        </configuration>
+                    </execution>
+
+                    <execution>
+                        <id>ingest-example</id>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>com.example.transit.examples.IngestExample</mainClass>
+                        </configuration>
+                    </execution>
+
+                    <execution>
+                        <id>service-monitor-example</id>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>com.example.transit.examples.ServiceMonitorExample</mainClass>
                         </configuration>
                     </execution>
                 </executions>

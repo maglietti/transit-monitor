@@ -1,16 +1,12 @@
-package com.example.transit.service;
+package com.example.transit.config;
 
-import com.example.transit.util.TerminalUtil;
 import io.github.cdimascio.dotenv.Dotenv;
 
 /**
- * Service for centralizing configuration loading and management.
- * This class handles loading environment variables, validating configuration,
- * and constructing consistent feed URLs across all examples and the main
- * application.
+ * Service for loading and validating configuration from environment variables.
  */
 public class ConfigService {
-    // Required configuration keys
+    // Configuration keys
     private static final String API_TOKEN_KEY = "API_TOKEN";
     private static final String BASE_URL_KEY = "GTFS_BASE_URL";
     private static final String AGENCY_KEY = "GTFS_AGENCY";
@@ -26,7 +22,6 @@ public class ConfigService {
 
     /**
      * Private constructor that loads configuration from .env file.
-     * Use getInstance() to access the singleton instance.
      */
     private ConfigService() {
         // Load environment variables from .env file
@@ -46,10 +41,7 @@ public class ConfigService {
     }
 
     /**
-     * Gets the singleton instance of ConfigurationService.
-     * This ensures all components use the same configuration.
-     *
-     * @return The ConfigurationService singleton instance
+     * Gets the singleton instance.
      */
     public static synchronized ConfigService getInstance() {
         if (instance == null) {
@@ -59,9 +51,7 @@ public class ConfigService {
     }
 
     /**
-     * Checks if all required configuration values are present.
-     *
-     * @return true if configuration is valid, false otherwise
+     * Checks if configuration is valid.
      */
     public boolean isValid() {
         return apiToken != null && !apiToken.isEmpty() &&
@@ -70,35 +60,26 @@ public class ConfigService {
     }
 
     /**
-     * Validates the configuration and prints error messages if invalid.
-     *
-     * @return true if configuration is valid, false otherwise
+     * Validates configuration and prints errors if invalid.
      */
     public boolean validateConfiguration() {
         if (!isValid()) {
-            System.err.println(TerminalUtil.ANSI_RED + "ERROR: Missing configuration. Please check your .env file."
-                    + TerminalUtil.ANSI_RESET);
-            System.err.println(TerminalUtil.ANSI_YELLOW + "Required variables: " + API_TOKEN_KEY + ", " + BASE_URL_KEY
-                    + ", " + AGENCY_KEY + TerminalUtil.ANSI_RESET);
-            return false;
+            System.err.println("ERROR: Missing configuration. Please check your .env file.");
+            System.err.println("Required variables: " + API_TOKEN_KEY + ", " + BASE_URL_KEY + ", " + AGENCY_KEY);
+            return true;
         }
-        return true;
+        return false;
     }
 
     /**
-     * Gets the feed URL constructed from configuration values.
-     * Returns null if configuration is invalid.
-     *
-     * @return The complete feed URL
+     * Gets the complete feed URL.
      */
     public String getFeedUrl() {
         return feedUrl;
     }
 
     /**
-     * Gets the feed URL with the API token hidden for logging purposes.
-     *
-     * @return The feed URL with API token masked
+     * Gets the feed URL with API token masked.
      */
     public String getRedactedFeedUrl() {
         if (feedUrl == null) {
@@ -109,8 +90,6 @@ public class ConfigService {
 
     /**
      * Gets the API token.
-     *
-     * @return The API token
      */
     public String getApiToken() {
         return apiToken;
@@ -118,8 +97,6 @@ public class ConfigService {
 
     /**
      * Gets the base URL.
-     *
-     * @return The base URL
      */
     public String getBaseUrl() {
         return baseUrl;
@@ -127,16 +104,13 @@ public class ConfigService {
 
     /**
      * Gets the agency code.
-     *
-     * @return The agency code
      */
     public String getAgency() {
         return agency;
     }
 
     /**
-     * Resets the singleton instance for testing purposes.
-     * This should only be used in test cases.
+     * Resets the singleton instance (for testing).
      */
     public static void reset() {
         instance = null;

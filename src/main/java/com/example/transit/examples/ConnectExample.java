@@ -1,39 +1,47 @@
 package com.example.transit.examples;
 
-import com.example.transit.service.ConnectService;
-import com.example.transit.util.LoggingUtil;
+import com.example.transit.config.IgniteConnectionManager;
 import org.apache.ignite.client.IgniteClient;
-import org.apache.ignite.network.ClusterNode;
 import org.apache.ignite.client.RetryLimitPolicy;
+import org.apache.ignite.network.ClusterNode;
+import org.apache.ignite.table.Table;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 /**
- * Example class for verifying connection to an Ignite 3 cluster.
- * This class demonstrates how to connect to a cluster and retrieve information.
+ * Example demonstrating connection to an Ignite cluster.
+ * Shows basic connection setup and displays detailed cluster information.
  */
-public class ConnectExample {
+public class ConnectExample {// install the bridge
+    private static final Logger logger = LogManager.getLogger(ConnectExample.class);
     public static void main(String[] args) {
-        // Configure logging to suppress unnecessary output
-        LoggingUtil.setLogs("OFF");
+
+        // Handle JUL logging
+        java.util.logging.LogManager.getLogManager().reset();
+        org.apache.logging.log4j.jul.LogManager.getLogManager();
+        java.util.logging.Logger.getLogger("").setLevel(java.util.logging.Level.WARNING);
 
         System.out.println("=== Connecting to Ignite cluster...");
 
         // Use try-with-resources to automatically handle connection cleanup
-        try (ConnectService connectionService = new ConnectService()) {
-            IgniteClient client = connectionService.getClient();
+        try (IgniteConnectionManager connectionManager = new IgniteConnectionManager()) {
+            IgniteClient client = connectionManager.getClient();
             clusterOverview(client);
         } catch (Exception e) {
-            System.err.println("Error during Ignite connection: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error initializing Ignite connection: {}", e.getMessage());
         }
 
         System.out.println("=== Disconnected from Ignite cluster");
     }
 
     /**
-     * Connects to an Ignite cluster and displays useful information
+     * Displays detailed information about the Ignite cluster.
      *
      * @param client The IgniteClient instance
      */
@@ -44,7 +52,7 @@ public class ConnectExample {
         System.out.println("\nCLUSTER TOPOLOGY:");
         try {
             // Get complete cluster topology
-            List<ClusterNode> allNodes = client.clusterNodes().stream().collect(Collectors.toList());
+            List<ClusterNode> allNodes = new ArrayList<>(client.clusterNodes());
 
             System.out.println("  • Total cluster nodes: " + allNodes.size());
 
@@ -77,7 +85,9 @@ public class ConnectExample {
 
         // Available Resources - Tables
         try {
-            List<String> tables = client.tables().tables().stream().map(table -> table.name()).collect(Collectors.toList());
+            List<String> tables = client.tables().tables().stream()
+                    .map(Table::name)
+                    .collect(Collectors.toList());
 
             System.out.println("\nAVAILABLE TABLES:");
             if (tables.isEmpty()) {
@@ -88,7 +98,7 @@ public class ConnectExample {
                 for (String tableName : tables) {
                     System.out.println("    - " + tableName);
                 }
-                System.out.println("  • Tip: Access a table with client.tables().table(\"" + (tables.isEmpty() ? "table_name" : tables.get(0)) + "\")");
+                System.out.println("  • Tip: Access a table with client.tables().table(\"" + tables.get(0) + "\")");
             }
         } catch (Exception e) {
             System.out.println("\nAVAILABLE TABLES:");
@@ -99,9 +109,10 @@ public class ConnectExample {
         // Client Retry Policy
         System.out.println("\nRETRY POLICY:");
         if (client.configuration().retryPolicy() != null) {
-            System.out.println("  • Type: " + client.configuration().retryPolicy().getClass().getSimpleName());
+            System.out.println("  • Type: " + Objects.requireNonNull(client.configuration().retryPolicy()).getClass().getSimpleName());
             if (client.configuration().retryPolicy() instanceof RetryLimitPolicy) {
                 RetryLimitPolicy policy = (RetryLimitPolicy) client.configuration().retryPolicy();
+                assert policy != null;
                 System.out.println("  • Retry limit: " + policy.retryLimit());
             }
             System.out.println("  • Tip: The retry policy helps maintain connection during network issues");
@@ -114,12 +125,12 @@ public class ConnectExample {
         System.out.println("\nSECURITY STATUS:");
         if (client.configuration().authenticator() != null) {
             System.out.println("  • Authentication: Enabled");
-            System.out.println("  • Type: " + client.configuration().authenticator().type());
+            System.out.println("  • Type: " + Objects.requireNonNull(client.configuration().authenticator()).type());
         } else {
             System.out.println("  • Authentication: Not configured");
         }
 
-        if (client.configuration().ssl() != null && client.configuration().ssl().enabled()) {
+        if (client.configuration().ssl() != null && Objects.requireNonNull(client.configuration().ssl()).enabled()) {
             System.out.println("  • SSL/TLS: Enabled");
         } else {
             System.out.println("  • SSL/TLS: Disabled");
