@@ -1,121 +1,96 @@
-# Your First Ignite App with Java: Public Transit Monitoring System
+# Transit Monitoring System with Apache Ignite 3
 
-## Introduction
+A real-time public transit monitoring application that demonstrates Apache Ignite 3's distributed data processing capabilities through practical, production-ready patterns.
 
-In this hands-on tutorial, you'll build a real-time transit monitoring system that demonstrates Apache Ignite 3's distributed data capabilities. Through this project, you'll experience firsthand how Ignite enables rapid development of applications that require high throughput, low latency, and resilient data processing.
+## Overview
 
-Transit data provides an ideal context for learning Ignite because it combines several challenging characteristics found in modern applications:
+This project showcases how to build a scalable transit monitoring system by leveraging Apache Ignite 3's distributed computing and data storage capabilities. The application consumes GTFS (General Transit Feed Specification) data to track vehicle positions, detect service disruptions, and provide operational insights through a terminal-based dashboard.
 
-- **Real-time data streams** that must be continuously processed
-- **Time-series data** requiring efficient storage and retrieval
-- **Geospatial components** for tracking vehicle locations
-- **Complex queries** for analyzing system performance
-- **Continuous monitoring** for detecting service anomalies
+## Key Features
 
-By completing this tutorial, you'll have:
-
-- A functional transit monitoring application with source code
-- A running Ignite cluster with populated data
-- A collection of reusable code components for working with Ignite
-- Practical experience with Ignite's core features
-- Knowledge to build your own distributed data applications
-
-You can complete the modules in a single session or spread them across multiple days. Each module builds incrementally on previous ones, with clear checkpoints to validate your progress.
-
-## What You'll Build
-
-By the end of this tutorial, you'll have created a complete transit monitoring dashboard that looks like this:
-
-```text
-╔══════════════════════════════════════════════════════╗
-║            TRANSIT MONITORING DASHBOARD              ║
-╚══════════════════════════════════════════════════════╝
-Current time: 2023-05-21 14:22:38
-
-SUMMARY VIEW
-────────────────────────────────────────────────────────────────
-ACTIVE VEHICLES BY ROUTE (last 15 minutes)
-• Route 14      : 32 vehicles ↑
-• Route 5       : 30 vehicles =
-• Route 38      : 28 vehicles ↓
-• Route 1       : 26 vehicles =
-• Route 8       : 24 vehicles ↑
-
-VEHICLE STATUS DISTRIBUTION
-• IN_TRANSIT_TO  : 342 vehicles ↑
-• STOPPED_AT     : 198 vehicles ↓
-
-DATA INGESTION STATUS
-• Status: Running
-• Total records fetched: 45,280
-• Total records stored: 45,280
-• Last fetch count: 540
-• Last fetch time: 876ms
-• Running time: 01:23:45
-• Ingestion rate: 9.12 records/second
-
-Views rotate automatically every 10 seconds
-Press ENTER at any time to exit
-```
-
-Your application will connect to real-time transit data feeds, store vehicle positions in a distributed Ignite database, analyze movement patterns, and alert operators to potential service disruptions. The system architecture will include:
-
-- A clustered Ignite database for distributed storage
-- A data ingestion pipeline for real-time updates
-- SQL-based analytics for operational insights
-- A monitoring system for service disruptions
-- A real-time console dashboard for visualization
-
-## What You'll Learn
-
-Throughout this tutorial, you'll gain hands-on experience with key Apache Ignite 3 features:
-
-### Data Modeling and Storage
-
-- Creating tables using Ignite's Java API
-- Defining appropriate schemas for time-series data
-- Managing primary keys and indices for optimal performance
-
-### Data Ingestion
-
-- Building data pipelines with proper error handling
-- Implementing efficient batch processing for high-throughput scenarios
-- Using scheduled execution for continuous data updates
-
-### Querying and Analysis
-
-- Writing SQL queries against distributed data
-- Using temporal functions for time-series analysis
-- Implementing complex joins and aggregations for operational insights
-
-### Monitoring and Alerting
-
-- Creating monitoring systems using SQL-based polling
-- Detecting anomalies in real-time data streams
-- Building simple visualization components for system status
+- **Real-time data ingestion** from GTFS feeds with resilient error handling
+- **Time-series data storage** using Ignite's distributed tables
+- **Automated service monitoring** for vehicle delays, bunching, and coverage gaps
+- **Interactive dashboard** with rotating views of system status
+- **Structured component architecture** demonstrating clean Java design patterns
 
 ## Prerequisites
 
-Before starting this tutorial, please ensure you have:
+- Java 11 or later
+- Maven 3.6+
+- Docker and Docker Compose
+- API key from a GTFS provider (e.g., 511.org)
 
-- **Java 11 or later** installed and properly configured
-  - Verify with `java --version` in your terminal
-- **Maven 3.6+** for dependency management
-  - Verify with `mvn --version`
-- **Docker 20.10+** and Docker Compose for running the Ignite 3 cluster
-  - Verify with `docker --version` and `docker-compose --version`
-- **IDE** such as IntelliJ IDEA or VS Code with Java extensions
-- **Basic Java knowledge**, including familiarity with classes, interfaces, and collections
-- **Some SQL experience** for understanding the query examples
-- **Completed the "Use the Java API" How-To guide** (recommended but not required)
+## Quick Start
 
-## Tutorial Flow
+### 1. Clone the Repository
 
-This tutorial is designed as a progressive journey through building a complete application.
+```bash
+git clone https://github.com/yourusername/transit-monitor.git
+cd transit-monitor
+```
 
-Each module builds on the previous ones, introducing new concepts while reinforcing what you've already learned. The code examples are designed to work together as a cohesive application, but each component also illustrates standalone concepts that can be applied to other projects.
+### 2. Configure Environment
 
-At the end of each module, you'll find clear checkpoints to validate your progress and ensure you're ready to move to the next section. If you encounter any issues, each module includes troubleshooting guidance to help you overcome common challenges.
+Copy the `.env.example` to `.env` and add your GTFS API token:
 
- **Next Steps:** Continue to [Module 2: Project Setup and Configuration](02-project-setup.md) to set up our project structure and configure our Ignite cluster!
- 
+```bash
+cp .env.example .env
+```
+
+Edit `.env` to include your API token.
+
+### 3. Start Ignite Cluster
+
+```bash
+docker compose up -d
+```
+
+### 4. Initialize the Cluster
+
+```bash
+docker run --rm -it --network=host -e LANG=C.UTF-8 -e LC_ALL=C.UTF-8 apacheignite/ignite:3.0.0 cli
+connect http://localhost:10300
+cluster init --name=ignite3 --metastorage-group=node1,node2,node3
+exit
+```
+
+## Learning Path
+
+Follow our step-by-step tutorial to understand the application architecture:
+
+1. [Introduction](docs/01-introduction.md)
+2. [Project Setup](docs/02-project-setup.md)
+3. [Understanding GTFS](docs/03-understanding-gtfs.md)
+4. [GTFS Client](docs/04-gtfs-client.md)
+5. [Data Ingestion](docs/05-data-ingestion.md)
+6. [Service Monitoring](docs/06-continuous-query.md)
+7. [Application Integration](docs/07-putting-together.md)
+
+## Example Applications
+
+Explore individual components with these standalone examples:
+
+```bash
+# Test Ignite connectivity
+mvn compile exec:java@connect-example
+
+# Verify schema creation
+mvn compile exec:java@schema-setup-example
+
+# Test GTFS feed access
+mvn compile exec:java@gtfs-feed-example
+
+# Run data ingestion process
+mvn compile exec:java@ingest-example
+
+# Try service monitoring
+mvn compile exec:java@service-monitor-example
+
+# Run the final application
+mvn compile exec:java@run-app
+```
+
+## License
+
+[Apache License 2.0](LICENSE)
