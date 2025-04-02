@@ -26,7 +26,17 @@ The application fetches real-time vehicle position data from GTFS (General Trans
 - Docker and Docker Compose
 - API key from a GTFS provider (e.g., 511.org)
 
-## Getting Started
+## Tutorial
+
+- [Introduction](docs/01-introduction.md)
+- [Project Setup](docs/02-project-setup.md)
+- [Understanding GTFS](docs/03-understanding-gtfs.md)
+- [GTFS Client](docs/04-gtfs-client.md)
+- [Data Ingestion](docs/05-data-ingestion.md)
+- [Service Monitoring](docs/06-continuous-query.md)
+- [Application Integration](docs/07-putting-together.md)
+
+## Quick Start
 
 ### 1. Clone the Repository
 
@@ -109,17 +119,6 @@ mvn compile exec:java@run-app
   - `model/`: Data models
   - `service/`: Business logic services
   - `util/`: Utility classes
-
-## Documentation
-
-- [Introduction](docs/01-introduction.md)
-- [Project Setup](docs/02-project-setup.md)
-- [Understanding GTFS](docs/03-understanding-gtfs.md)
-- [GTFS Client](docs/04-gtfs-client.md)
-- [Data Ingestion](docs/05-data-ingestion.md)
-- [SQL Queries](docs/06-implementing-queries.md)
-- [Service Monitoring](docs/07-continuous-query.md)
-- [Application Integration](docs/08-putting-together.md)
 
 ## Technologies
 
