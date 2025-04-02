@@ -1,23 +1,18 @@
 # Transit Monitoring System with Apache Ignite 3
 
+A real-time public transit monitoring application that demonstrates Apache Ignite 3's distributed data processing capabilities through practical, production-ready patterns.
+
 ## Overview
 
-This project demonstrates building a real-time transit monitoring application using Apache Ignite 3, showcasing distributed data processing, SQL querying, and continuous monitoring capabilities.
+This project showcases how to build a scalable transit monitoring system by leveraging Apache Ignite 3's distributed computing and data storage capabilities. The application consumes GTFS (General Transit Feed Specification) data to track vehicle positions, detect service disruptions, and provide operational insights through a terminal-based dashboard.
 
-The application fetches real-time vehicle position data from GTFS (General Transit Feed Specification) feeds, stores it in a distributed Ignite database, and provides a live monitoring dashboard that tracks:
+## Key Features
 
-- Vehicle positions
-- Route coverage
-- Service disruptions
-- System performance
-
-## Features
-
-- Real-time transit data ingestion
-- Distributed data storage with Apache Ignite 3
-- SQL-based analytics and monitoring
-- Console dashboard with multiple views
-- Automated service disruption detection
+- **Real-time data ingestion** from GTFS feeds with resilient error handling
+- **Time-series data storage** using Ignite's distributed tables
+- **Automated service monitoring** for vehicle delays, bunching, and coverage gaps
+- **Interactive dashboard** with rotating views of system status
+- **Structured component architecture** demonstrating clean Java design patterns
 
 ## Prerequisites
 
@@ -25,16 +20,6 @@ The application fetches real-time vehicle position data from GTFS (General Trans
 - Maven 3.6+
 - Docker and Docker Compose
 - API key from a GTFS provider (e.g., 511.org)
-
-## Tutorial
-
-- [Introduction](docs/01-introduction.md)
-- [Project Setup](docs/02-project-setup.md)
-- [Understanding GTFS](docs/03-understanding-gtfs.md)
-- [GTFS Client](docs/04-gtfs-client.md)
-- [Data Ingestion](docs/05-data-ingestion.md)
-- [Service Monitoring](docs/06-continuous-query.md)
-- [Application Integration](docs/07-putting-together.md)
 
 ## Quick Start
 
@@ -53,7 +38,7 @@ Copy the `.env.example` to `.env` and add your GTFS API token:
 cp .env.example .env
 ```
 
-Edit `.env` and replace `your_token_here` with a valid GTFS API token.
+Edit `.env` to include your API token.
 
 ### 3. Start Ignite Cluster
 
@@ -61,7 +46,7 @@ Edit `.env` and replace `your_token_here` with a valid GTFS API token.
 docker compose up -d
 ```
 
-### 4. Initialize the cluster
+### 4. Initialize the Cluster
 
 ```bash
 docker run --rm -it --network=host -e LANG=C.UTF-8 -e LC_ALL=C.UTF-8 apacheignite/ignite:3.0.0 cli
@@ -70,79 +55,42 @@ cluster init --name=ignite3 --metastorage-group=node1,node2,node3
 exit
 ```
 
+## Learning Path
+
+Follow our step-by-step tutorial to understand the application architecture:
+
+1. [Introduction](docs/01-introduction.md)
+2. [Project Setup](docs/02-project-setup.md)
+3. [Understanding GTFS](docs/03-understanding-gtfs.md)
+4. [GTFS Client](docs/04-gtfs-client.md)
+5. [Data Ingestion](docs/05-data-ingestion.md)
+6. [Service Monitoring](docs/06-continuous-query.md)
+7. [Application Integration](docs/07-putting-together.md)
+
 ## Example Applications
 
-The project includes several example applications to demonstrate different features:
-
-### Connection Example
+Explore individual components with these standalone examples:
 
 ```bash
+# Test Ignite connectivity
 mvn compile exec:java@connect-example
-```
 
-### Schema Example
-
-```bash
+# Verify schema creation
 mvn compile exec:java@schema-setup-example
-```
 
-### GTFS Feed Example
-
-```bash
+# Test GTFS feed access
 mvn compile exec:java@gtfs-feed-example
-```
 
-### Ingestion Example
-
-```bash
+# Run data ingestion process
 mvn compile exec:java@ingest-example
-```
 
-### Service Monitor Example
-
-```bash
+# Try service monitoring
 mvn compile exec:java@service-monitor-example
-```
 
-### Run the Service Monitor App
-
-```bash
+# Run the final application
 mvn compile exec:java@run-app
 ```
-
-## Project Structure
-
-- `src/main/java/com/example/transit/`
-  - `app/`: Main application
-  - `config/`: Configuration management
-  - `examples/`: Demonstration applications
-  - `model/`: Data models
-  - `service/`: Business logic services
-  - `util/`: Utility classes
-
-## Technologies
-
-- Apache Ignite 3
-- Java
-- Maven
-- Docker
-- GTFS-realtime
-- Protocol Buffers
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
 
 ## License
 
 [Apache License 2.0](LICENSE)
-
-## Acknowledgments
-
-- Apache Ignite Community
-- GTFS Specification Developers
-- Transit Agencies Providing Open Data
