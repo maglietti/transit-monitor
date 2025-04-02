@@ -7,65 +7,61 @@ In this final module, we'll orchestrate all the components we've built into a co
 Before diving into the code, let's review the complete architecture of our transit monitoring system:
 
 ```mermaid
-graph TB
-    %% External systems
-    GTFS[(GTFS Feed)]
-    EnvFile[(.env File)]
+flowchart TB
+    %% Use a cleaner layout with straight lines where possible
+    %% External systems with thick borders
+    GTFS[("GTFS-realtime Feed")]:::external
+    EnvFile[(".env Configuration")]:::external
     
-    %% Config components
-    ConfigService[ConfigService]
-    ConnectionManager[IgniteConnectionManager]
-    TableManager[VehiclePositionTableManager]
+    %% Config components in blue
+    ConfigService[ConfigService]:::config
+    ConnectionManager[IgniteConnectionManager]:::config
+    TableManager[VehiclePositionTableManager]:::config
     
-    %% Core services
-    GtfsService[GtfsService]
-    IngestionService[DataIngestionService]
-    MonitorService[MonitorService]
-    ReportingService[ReportingService]
+    %% Core services in green
+    GtfsService[GtfsService]:::service
+    IngestionService[DataIngestionService]:::service
+    MonitorService[MonitorService]:::service
+    ReportingService[ReportingService]:::service
     
-    %% Main application
-    TransitApp[TransitMonitorApp]
+    %% Main application with double border
+    TransitApp[TransitMonitorApp]:::app
     
-    %% Database
-    Ignite[(Apache Ignite)]
+    %% Database in purple
+    Ignite[("Apache Ignite Cluster")]:::database
     
-    %% Relationships - External to Config
-    EnvFile --> ConfigService
+    %% Cleaner relationships with high-contrast labels
+    EnvFile --> |Loads credentials| ConfigService
     
-    %% Relationships - Config layer
-    ConfigService --> GtfsService
-    ConnectionManager --> Ignite
+    ConfigService --> |Provides feed URL| GtfsService
+    
+    ConnectionManager --> |Creates client connection| Ignite
     TableManager --> ConnectionManager
-    TableManager --> Ignite
+    TableManager --> |Creates schema in| Ignite
     
-    %% Relationships - Service layer
-    GtfsService --> GTFS
+    GtfsService --> |Fetches data from| GTFS
+    
+    %% Core service relationships
     IngestionService --> GtfsService
-    IngestionService --> ConnectionManager
-    MonitorService --> ConnectionManager
-    ReportingService --> ConnectionManager
+    IngestionService --> |Stores data via| ConnectionManager
+    MonitorService --> |Queries data via| ConnectionManager
+    ReportingService --> |Reads statistics via| ConnectionManager
     
-    %% Relationships - Application layer
+    %% Cleaner application relationships
     TransitApp --> ConfigService
-    TransitApp --> ConnectionManager
-    TransitApp --> TableManager
-    TransitApp --> GtfsService
-    TransitApp --> IngestionService
-    TransitApp --> MonitorService
-    TransitApp --> ReportingService
+    TransitApp --> |Manages| ConnectionManager
+    TransitApp --> |Initializes| TableManager
+    TransitApp --> |Orchestrates| GtfsService
+    TransitApp --> |Schedules| IngestionService
+    TransitApp --> |Controls| MonitorService
+    TransitApp --> |Displays via| ReportingService
     
-    %% Styling
-    classDef external fill:#f5f5f5,stroke:#999,stroke-width:1px
-    classDef config fill:#e1f5fe,stroke:#0288d1,stroke-width:1px
-    classDef service fill:#e8f5e9,stroke:#4caf50,stroke-width:1px
-    classDef app fill:#fff3e0,stroke:#ff9800,stroke-width:2px
-    classDef database fill:#f3e5f5,stroke:#9c27b0,stroke-width:1px
-    
-    class GTFS,EnvFile external
-    class ConfigService,ConnectionManager,TableManager config
-    class GtfsService,IngestionService,MonitorService,ReportingService service
-    class TransitApp app
-    class Ignite database
+    %% Clearer class definitions with high-contrast colors
+    classDef external fill:#F8F8F8,stroke:#000000,stroke-width:3px,color:#000000
+    classDef config fill:#4682B4,stroke:#000000,stroke-width:1px,color:#FFFFFF
+    classDef service fill:#2E8B57,stroke:#000000,stroke-width:1px,color:#FFFFFF
+    classDef app fill:#FF8C00,stroke:#000000,stroke-width:3px,color:#000000
+    classDef database fill:#8A2BE2,stroke:#000000,stroke-width:3px,color:#FFFFFF
 ```
 
 This architecture demonstrates several important design principles:
